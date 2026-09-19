@@ -3,6 +3,7 @@
 require "date"
 require "digest"
 require "fileutils"
+require "json"
 require "optparse"
 require "yaml"
 require "zlib"
@@ -17,6 +18,7 @@ module Mirzam
   class Error < StandardError; end
   Source = Data.define(:title, :author, :date, :tags, :description, :accent, :template) do
     def self.from(hash)
+      raise Error, "metadata must be a mapping" unless hash.is_a?(Hash)
       values = hash.transform_keys(&:to_sym)
       ogp = values[:ogp].is_a?(Hash) ? values[:ogp].transform_keys(&:to_sym) : {}
       new(title: values.fetch(:title).to_s, author: values[:author]&.to_s,
@@ -48,6 +50,20 @@ module Mirzam
       parse(File.read(path, encoding: "UTF-8"))
     rescue Errno::ENOENT
       raise Error, "input file not found: #{path}"
+    end
+  end
+
+  module Input
+    module_function
+
+    def read(path)
+      source = File.read(path, encoding: "UTF-8")
+      return Source.from(JSON.parse(source)) if File.extname(path).downcase == ".json"
+      FrontMatter.parse(source)
+    rescue Errno::ENOENT
+      raise Error, "input file not found: #{path}"
+    rescue JSON::ParserError => error
+      raise Error, "invalid JSON: #{error.message}"
     end
   end
 
@@ -164,7 +180,7 @@ module Mirzam
     def render(paths, out_dir:, force: false)
       FileUtils.mkdir_p(out_dir)
       paths.sort.filter_map do |path|
-        source = FrontMatter.read(path)
+        source = Input.read(path)
         destination = File.join(out_dir, "#{File.basename(path, ".*")}.png")
         template_path = @template.to_s
         template_signature = File.file?(template_path) ? File.binread(template_path) : @template.to_s
@@ -226,7 +242,7 @@ module Mirzam
         opts.on("--size SIZE") { |v| options[:width], options[:height] = v.split("x", 2).map { |part| Integer(part, 10) } }
         opts.on("--font-dir PATH") { |v| options[:font_dir] = v }
       end.parse!(argv)
-      source = options[:input] ? FrontMatter.read(options[:input]) : Source.from(title: options[:title] || argv.fetch(0))
+      source = options[:input] ? Input.read(options[:input]) : Source.from(title: options[:title] || argv.fetch(0))
       selected_theme = Mirzam.theme(options[:theme])
       selected_template = source.template || options[:template]
       png = Renderer.new(theme: selected_theme, width: options[:width], height: options[:height], font_dir: options[:font_dir])
