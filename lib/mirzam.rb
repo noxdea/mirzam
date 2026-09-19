@@ -104,7 +104,8 @@ module Mirzam
 
     def resolve(name, theme: Zaniah::Theme.dark)
       if name.to_s.end_with?(".rb") && File.file?(name.to_s)
-        value = Kernel.load(File.expand_path(name.to_s))
+        path = File.expand_path(name.to_s)
+        value = eval(File.read(path, encoding: "UTF-8"), TOPLEVEL_BINDING, path, 1)
         return value if value.respond_to?(:call)
         raise Error, "template file must return a callable"
       end
@@ -159,7 +160,8 @@ module Mirzam
       paths.sort.filter_map do |path|
         source = FrontMatter.read(path)
         destination = File.join(out_dir, "#{File.basename(path, ".*")}.png")
-        template_signature = @template.respond_to?(:to_path) && File.file?(@template.to_path) ? File.binread(@template.to_path) : @template.to_s
+        template_path = @template.to_s
+        template_signature = File.file?(template_path) ? File.binread(template_path) : @template.to_s
         signature = Digest::SHA256.hexdigest(File.binread(path) + template_signature)
         state_path = "#{destination}.json"
         next if !force && File.file?(destination) && File.file?(state_path) && File.read(state_path).include?(signature)
@@ -232,7 +234,7 @@ module Mirzam
       options = {out_dir: "public/ogp", template: :default, force: false}
       OptionParser.new do |opts|
         opts.on("--out-dir DIR") { |v| options[:out_dir] = v }
-        opts.on("--template NAME") { |v| options[:template] = v.to_sym }
+        opts.on("--template NAME") { |v| options[:template] = v.end_with?(".rb") ? v : v.to_sym }
         opts.on("--force") { options[:force] = true }
       end.parse!(argv)
       paths = argv.flat_map { |pattern| Dir[pattern] }
