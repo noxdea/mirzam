@@ -231,14 +231,18 @@ module Mirzam
     private_class_method :render
 
     def self.batch(argv)
-      options = {out_dir: "public/ogp", template: :default, force: false}
+      options = {out_dir: "public/ogp", template: :default, force: false, theme: :dark, width: 1200, height: 630, font_dir: nil}
       OptionParser.new do |opts|
         opts.on("--out-dir DIR") { |v| options[:out_dir] = v }
         opts.on("--template NAME") { |v| options[:template] = v.end_with?(".rb") ? v : v.to_sym }
+        opts.on("--theme NAME") { |v| options[:theme] = v }
+        opts.on("--size SIZE") { |v| options[:width], options[:height] = v.split("x", 2).map { |part| Integer(part, 10) } }
+        opts.on("--font-dir PATH") { |v| options[:font_dir] = v }
         opts.on("--force") { options[:force] = true }
       end.parse!(argv)
       paths = argv.flat_map { |pattern| Dir[pattern] }
-      Batch.new(template: options[:template]).render(paths, out_dir: options[:out_dir], force: options[:force])
+      renderer = Renderer.new(theme: Mirzam.theme(options[:theme]), width: options[:width], height: options[:height], font_dir: options[:font_dir])
+      Batch.new(renderer: renderer, template: options[:template]).render(paths, out_dir: options[:out_dir], force: options[:force])
       0
     end
     private_class_method :batch

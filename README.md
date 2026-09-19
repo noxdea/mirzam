@@ -21,6 +21,7 @@ mirzam templates
 
 Front matter requires `title`; `author`, `date`, `tags`, `accent`, and
 `ogp.template` are optional. The Ruby API is `Mirzam.render(title: "Hello")`.
+The same batch command is available through [`action.yml`](action.yml).
 
 ## Development
 
