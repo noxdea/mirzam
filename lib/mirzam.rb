@@ -39,7 +39,7 @@ module Mirzam
       return Source.from(title: text.to_s) unless text.start_with?("---")
       closing = text.match(/^---\s*$\n?/, 3)
       raise Error, "front matter is not closed" unless closing
-      header = text.byteslice(4...closing.begin(0))
+      header = text[4...closing.begin(0)]
       values = YAML.safe_load(header, permitted_classes: [Date, Time], aliases: false) || {}
       raise Error, "front matter must be a mapping" unless values.is_a?(Hash)
       Source.from(values)

@@ -46,4 +46,10 @@ RSpec.describe Mirzam do
   ensure
     FileUtils.remove_entry(dir) if dir
   end
+
+  it "parses UTF-8 titles without splitting multibyte characters" do
+    title = [0x65e5, 0x672c, 0x8a9e].pack("U*")
+    source = Mirzam::FrontMatter.parse("---\ntitle: #{title}\n---\n")
+    expect(source.title).to eq(title)
+  end
 end
