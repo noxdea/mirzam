@@ -52,4 +52,9 @@ RSpec.describe Mirzam do
     source = Mirzam::FrontMatter.parse("---\ntitle: #{title}\n---\n")
     expect(source.title).to eq(title)
   end
+
+  it "accepts a UTF-8 BOM before front matter" do
+    source = Mirzam::FrontMatter.parse("\uFEFF---\ntitle: BOM\n---\n本文")
+    expect(source.title).to eq("BOM")
+  end
 end

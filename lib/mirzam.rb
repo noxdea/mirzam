@@ -36,6 +36,7 @@ module Mirzam
     module_function
 
     def parse(text)
+      text = text.to_s.delete_prefix("\uFEFF")
       return Source.from(title: text.to_s) unless text.start_with?("---")
       closing = text.match(/^---\s*$\n?/, 3)
       raise Error, "front matter is not closed" unless closing
