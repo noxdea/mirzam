@@ -184,7 +184,9 @@ module Mirzam
     end
 
     def render(source, template: Templates::Default.new(theme: @theme))
-      window = Zaniah::Platform.open_window(backend: :headless, width: @width, height: @height)
+      app = Zaniah::App.new
+      window = app.open_window(backend: :headless, width: @width, height: @height)
+      app.global(:theme, @theme)
       window.text_system = @text_system if @text_system
       window.draw { template.call(source, self) }
       window.tick
