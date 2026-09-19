@@ -1,4 +1,9 @@
 module Mirzam
   VERSION: String
-  # See the writing guide of rbs: https://github.com/ruby/rbs#guides
+  def self.render: (title: String, ?author: String?, ?date: String?, ?tags: Array[String], ?description: String?, ?accent: String?, ?template: Symbol, ?theme: untyped, ?width: Integer, ?height: Integer, ?font_dir: String?) -> String
+  class Error < StandardError
+  end
+  class Renderer
+    def render: (untyped source, ?template: untyped) -> String
+  end
 end
