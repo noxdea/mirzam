@@ -1,0 +1,45 @@
+name: Mirzam OGP
+description: Generate deterministic OGP images from Markdown front matter
+inputs:
+  pattern:
+    description: Glob of Markdown files
+    required: true
+  out-dir:
+    description: Output directory
+    required: false
+    default: public/ogp
+  template:
+    description: Template name or Ruby file
+    required: false
+    default: default
+  theme:
+    description: dark, light, high_contrast, or a token file
+    required: false
+    default: dark
+  force:
+    description: Ignore sidecar hashes
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1.323.0
+      with:
+        ruby-version: '3.3'
+    - name: Install Mirzam
+      shell: bash
+      run: gem install mirzam --no-document # zizmor: ignore[adhoc-packages]
+    - name: Render OGP images
+      shell: bash
+      env:
+        MIRZAM_PATTERN: ${{ inputs.pattern }}
+        MIRZAM_OUT_DIR: ${{ inputs.out-dir }}
+        MIRZAM_TEMPLATE: ${{ inputs.template }}
+        MIRZAM_THEME: ${{ inputs.theme }}
+        MIRZAM_FORCE: ${{ inputs.force }}
+      run: |
+        args=(batch "$MIRZAM_PATTERN" --out-dir "$MIRZAM_OUT_DIR" --template "$MIRZAM_TEMPLATE")
+        [[ "$MIRZAM_THEME" != dark ]] && args+=(--theme "$MIRZAM_THEME")
+        [[ "$MIRZAM_FORCE" == true ]] && args+=(--force)
+        mirzam "${args[@]}"

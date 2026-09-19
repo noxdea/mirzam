@@ -1,0 +1,69 @@
+# frozen_string_literal: true
+
+require "tempfile"
+require "fileutils"
+
+RSpec.describe Mirzam do
+  it "parses front matter and normalizes optional values" do
+    source = Mirzam::FrontMatter.parse("---\ntitle: Hello\ntags: [ruby, ui]\n---\nbody")
+    expect(source.title).to eq("Hello")
+    expect(source.tags).to eq(%w[ruby ui])
+  end
+
+  it "rejects missing titles" do
+    expect { Mirzam::Source.from(author: "x") }.to raise_error(Mirzam::Error)
+  end
+
+  it "selects a size when a typesetter measures paragraphs" do
+    typesetter = instance_double("Typesetter")
+    allow(typesetter).to receive(:layout_paragraph).and_return(instance_double("Paragraph", height: 100))
+    expect(Mirzam::Sizing.fit_size("title", max_width: 100, max_height: 100, typesetter: typesetter)).to eq(64)
+  end
+
+  it "reads JSON metadata and rejects non-object input" do
+    json = Tempfile.new(["mirzam", ".json"])
+    json.write('{"title":"JSON title","tags":["ruby"]}')
+    json.close
+    expect(Mirzam::Input.read(json.path).title).to eq("JSON title")
+    File.write(json.path, '[]')
+    expect { Mirzam::Input.read(json.path) }.to raise_error(Mirzam::Error, /mapping/)
+  ensure
+    json&.unlink
+  end
+
+  it "keeps image branding metadata and uses a bundled font" do
+    source = Mirzam::Source.from(title: "Title", logo: "logo.png", avatar: "avatar.png")
+    expect(source.logo).to eq("logo.png")
+    expect(source.avatar).to eq("avatar.png")
+    expect(Mirzam::Renderer::FONTS).not_to be_empty
+  end
+
+  it "resolves image metadata relative to the input document" do
+    dir = Dir.mktmpdir("mirzam-assets")
+    path = File.join(dir, "post.md")
+    File.write(path, "---\ntitle: Title\nlogo: assets/logo.png\n---\n")
+    expect(Mirzam::Input.read(path).logo).to eq(File.join(dir, "assets/logo.png"))
+  ensure
+    FileUtils.remove_entry(dir) if dir
+  end
+
+  it "parses UTF-8 titles without splitting multibyte characters" do
+    title = [0x65e5, 0x672c, 0x8a9e].pack("U*")
+    source = Mirzam::FrontMatter.parse("---\ntitle: #{title}\n---\n")
+    expect(source.title).to eq(title)
+  end
+
+  it "accepts a UTF-8 BOM before front matter" do
+    source = Mirzam::FrontMatter.parse("\uFEFF---\ntitle: BOM\n---\n本文")
+    expect(source.title).to eq("BOM")
+  end
+
+  it "accepts a UTF-8 BOM before JSON metadata" do
+    file = Tempfile.new(["mirzam", ".json"])
+    file.write("\uFEFF{\"title\":\"BOM\"}")
+    file.close
+    expect(Mirzam::Input.read(file.path).title).to eq("BOM")
+  ensure
+    file&.unlink
+  end
+end
