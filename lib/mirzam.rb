@@ -2,10 +2,15 @@
 
 require "date"
 require "digest"
+require "fileutils"
 require "optparse"
 require "yaml"
 require "zlib"
 require "zaniah"
+begin
+  require "auva"
+rescue LoadError
+end
 require_relative "mirzam/version"
 
 module Mirzam
@@ -13,10 +18,11 @@ module Mirzam
   Source = Data.define(:title, :author, :date, :tags, :description, :accent, :template) do
     def self.from(hash)
       values = hash.transform_keys(&:to_sym)
+      ogp = values[:ogp].is_a?(Hash) ? values[:ogp].transform_keys(&:to_sym) : {}
       new(title: values.fetch(:title).to_s, author: values[:author]&.to_s,
         date: values[:date]&.to_s, tags: Array(values[:tags]).map(&:to_s),
-        description: values[:description]&.to_s, accent: values[:accent],
-        template: values[:template]&.to_sym)
+        description: values[:description]&.to_s, accent: values[:accent] || ogp[:accent],
+        template: (values[:template] || ogp[:template])&.to_sym)
     rescue KeyError
       raise Error, "front matter requires title"
     end
@@ -97,6 +103,11 @@ module Mirzam
     module_function
 
     def resolve(name, theme: Zaniah::Theme.dark)
+      if name.to_s.end_with?(".rb") && File.file?(name.to_s)
+        value = Kernel.load(File.expand_path(name.to_s))
+        return value if value.respond_to?(:call)
+        raise Error, "template file must return a callable"
+      end
       case name.to_s
       when "default" then Default.new(theme: theme)
       when "minimal" then Minimal.new(theme: theme)
@@ -111,9 +122,9 @@ module Mirzam
 
     attr_reader :typesetter
 
-    def initialize(theme: Zaniah::Theme.dark, width: SIZE[0], height: SIZE[1])
+    def initialize(theme: Zaniah::Theme.dark, width: SIZE[0], height: SIZE[1], font_dir: nil)
       @theme, @width, @height = theme, width, height
-      @font_db = Zaniah::TextSystem::FontDB.new(paths: [])
+      @font_db = Zaniah::TextSystem::FontDB.new(paths: Array(font_dir).compact)
       @font = @font_db.find(family: theme.typography.font_sans)
       @text_system = Zaniah::TextSystem::Renderer.new(font: @font, font_db: @font_db)
       @typesetter = Zaniah::TextSystem::Typesetter.new(font: @font, font_db: @font_db)
@@ -144,11 +155,12 @@ module Mirzam
     end
 
     def render(paths, out_dir:, force: false)
-      Dir.mkdir(out_dir) unless Dir.exist?(out_dir)
+      FileUtils.mkdir_p(out_dir)
       paths.sort.filter_map do |path|
         source = FrontMatter.read(path)
         destination = File.join(out_dir, "#{File.basename(path, ".*")}.png")
-        signature = Digest::SHA256.hexdigest(File.binread(path) + @template.to_s)
+        template_signature = @template.respond_to?(:to_path) && File.file?(@template.to_path) ? File.binread(@template.to_path) : @template.to_s
+        signature = Digest::SHA256.hexdigest(File.binread(path) + template_signature)
         state_path = "#{destination}.json"
         next if !force && File.file?(destination) && File.file?(state_path) && File.read(state_path).include?(signature)
         png = @renderer.render(source, template: Templates.resolve(source.template || @template))
@@ -159,32 +171,58 @@ module Mirzam
     end
   end
 
+  module_function
+
+  def theme(value)
+    return value if value.respond_to?(:colors)
+    return Auva.load(value) if defined?(Auva) && File.file?(value.to_s)
+    return Auva.builtin(value) if defined?(Auva)
+    Zaniah::Theme.public_send(value.to_s)
+  rescue NoMethodError
+    raise Error, "unknown theme: #{value}"
+  end
+
+  def render(title:, author: nil, date: nil, tags: [], description: nil, accent: nil,
+    template: :default, theme: :dark, width: 1200, height: 630, font_dir: nil)
+    source = Source.new(title: title.to_s, author: author&.to_s, date: date&.to_s,
+      tags: Array(tags).map(&:to_s), description: description&.to_s, accent: accent, template: template.to_sym)
+    selected_theme = theme(theme)
+    Renderer.new(theme: selected_theme, width: width, height: height, font_dir: font_dir)
+      .render(source, template: Templates.resolve(template, theme: selected_theme))
+  end
+
   class CLI
     def self.run(argv, out: $stdout, err: $stderr)
-      command = %w[render batch templates].include?(argv.first) ? argv.shift : "render"
+      command = %w[render batch templates preview].include?(argv.first) ? argv.shift : "render"
       case command
       when "templates"
         out.puts %w[default minimal feature]
         return 0
-      when "render" then render(argv)
+      when "render", "preview" then render(argv)
       when "batch" then batch(argv)
       end
-    rescue OptionParser::ParseError, Error => error
+    rescue OptionParser::ParseError, KeyError, Error => error
       err.puts "mirzam: #{error.message}"
       1
     end
 
     def self.render(argv)
-      options = {title: nil, author: nil, out: nil, input: nil, template: :default}
+      options = {title: nil, author: nil, out: nil, input: nil, template: :default, theme: :dark, width: 1200, height: 630, font_dir: nil}
       OptionParser.new do |opts|
         opts.on("--input PATH") { |v| options[:input] = v }
         opts.on("--title TITLE") { |v| options[:title] = v }
         opts.on("--author NAME") { |v| options[:author] = v }
         opts.on("--out PATH") { |v| options[:out] = v }
-        opts.on("--template NAME") { |v| options[:template] = v.to_sym }
+        opts.on("--template NAME") { |v| options[:template] = v.end_with?(".rb") ? v : v.to_sym }
+        opts.on("--theme NAME") { |v| options[:theme] = v }
+        opts.on("--size SIZE") { |v| options[:width], options[:height] = v.split("x", 2).map { |part| Integer(part, 10) } }
+        opts.on("--font-dir PATH") { |v| options[:font_dir] = v }
       end.parse!(argv)
       source = options[:input] ? FrontMatter.read(options[:input]) : Source.from(title: options[:title] || argv.fetch(0))
-      png = Renderer.new.render(source, template: Templates.resolve(source.template || options[:template]))
+      selected_theme = Mirzam.theme(options[:theme])
+      selected_template = source.template || options[:template]
+      png = Renderer.new(theme: selected_theme, width: options[:width], height: options[:height], font_dir: options[:font_dir])
+        .render(source, template: Templates.resolve(selected_template, theme: selected_theme))
       File.binwrite(options[:out] || "mirzam.png", png)
       0
     end
