@@ -16,7 +16,7 @@ require_relative "mirzam/version"
 
 module Mirzam
   class Error < StandardError; end
-  Source = Data.define(:title, :author, :date, :tags, :description, :accent, :template) do
+  Source = Data.define(:title, :author, :date, :tags, :description, :accent, :template, :logo, :avatar) do
     def self.from(hash)
       raise Error, "metadata must be a mapping" unless hash.is_a?(Hash)
       values = hash.transform_keys(&:to_sym)
@@ -24,7 +24,8 @@ module Mirzam
       new(title: values.fetch(:title).to_s, author: values[:author]&.to_s,
         date: values[:date]&.to_s, tags: Array(values[:tags]).map(&:to_s),
         description: values[:description]&.to_s, accent: values[:accent] || ogp[:accent],
-        template: (values[:template] || ogp[:template])&.to_sym)
+        template: (values[:template] || ogp[:template])&.to_sym,
+        logo: (values[:logo] || ogp[:logo])&.to_s, avatar: (values[:avatar] || ogp[:avatar])&.to_s)
     rescue KeyError
       raise Error, "front matter requires title"
     end
@@ -93,12 +94,24 @@ module Mirzam
 
       def call(source, renderer)
         size = renderer.fit_size(source.title, max_width: SIZE[0] - PADDING * 2, max_height: 300)
-        Zaniah::Div.new.flex_col.p(PADDING).gap(20).bg(@theme.colors.background)
+        root = Zaniah::Div.new.flex_col.p(PADDING).gap(20).bg(@theme.colors.background)
+          .child(brand(source))
           .child(Zaniah::Text.new(source.author ? "#{source.author} · #{source.date}" : "",
             size: 20, color: @accent))
           .child(Zaniah::Text.new(source.title, size: size, color: @theme.colors.text))
           .child(Zaniah::Text.new(source.tags.empty? ? "" : source.tags.map { |tag| "##{tag}" }.join("  "),
             size: 18, color: @theme.colors.text_muted))
+        root
+      end
+
+      private
+
+      def brand(source)
+        path = source.avatar || source.logo
+        return Zaniah::Div.new.h(1) unless path && File.file?(path)
+        Zaniah::Image.new(path).style(width: 64, height: 64)
+      rescue StandardError
+        Zaniah::Div.new.h(1)
       end
     end
 
@@ -206,10 +219,11 @@ module Mirzam
     raise Error, "unknown theme: #{value}"
   end
 
-  def render(title:, author: nil, date: nil, tags: [], description: nil, accent: nil,
+  def render(title:, author: nil, date: nil, tags: [], description: nil, accent: nil, logo: nil, avatar: nil,
     template: :default, theme: :dark, width: 1200, height: 630, font_dir: nil)
     source = Source.new(title: title.to_s, author: author&.to_s, date: date&.to_s,
-      tags: Array(tags).map(&:to_s), description: description&.to_s, accent: accent, template: template.to_sym)
+      tags: Array(tags).map(&:to_s), description: description&.to_s, accent: accent, template: template.to_sym,
+      logo: logo&.to_s, avatar: avatar&.to_s)
     selected_theme = theme(theme)
     Renderer.new(theme: selected_theme, width: width, height: height, font_dir: font_dir)
       .render(source, template: Templates.resolve(template, theme: selected_theme))
@@ -231,18 +245,21 @@ module Mirzam
     end
 
     def self.render(argv)
-      options = {title: nil, author: nil, out: nil, input: nil, template: :default, theme: :dark, width: 1200, height: 630, font_dir: nil}
+      options = {title: nil, author: nil, logo: nil, avatar: nil, out: nil, input: nil, template: :default, theme: :dark, width: 1200, height: 630, font_dir: nil}
       OptionParser.new do |opts|
         opts.on("--input PATH") { |v| options[:input] = v }
         opts.on("--title TITLE") { |v| options[:title] = v }
         opts.on("--author NAME") { |v| options[:author] = v }
+        opts.on("--logo PATH") { |v| options[:logo] = v }
+        opts.on("--avatar PATH") { |v| options[:avatar] = v }
         opts.on("--out PATH") { |v| options[:out] = v }
         opts.on("--template NAME") { |v| options[:template] = v.end_with?(".rb") ? v : v.to_sym }
         opts.on("--theme NAME") { |v| options[:theme] = v }
         opts.on("--size SIZE") { |v| options[:width], options[:height] = v.split("x", 2).map { |part| Integer(part, 10) } }
         opts.on("--font-dir PATH") { |v| options[:font_dir] = v }
       end.parse!(argv)
-      source = options[:input] ? Input.read(options[:input]) : Source.from(title: options[:title] || argv.fetch(0))
+      source = options[:input] ? Input.read(options[:input]) : Source.from(title: options[:title] || argv.fetch(0),
+        author: options[:author], logo: options[:logo], avatar: options[:avatar])
       selected_theme = Mirzam.theme(options[:theme])
       selected_template = source.template || options[:template]
       png = Renderer.new(theme: selected_theme, width: options[:width], height: options[:height], font_dir: options[:font_dir])

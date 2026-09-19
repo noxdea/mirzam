@@ -29,4 +29,11 @@ RSpec.describe Mirzam do
   ensure
     json&.unlink
   end
+
+  it "keeps image branding metadata and uses a bundled font" do
+    source = Mirzam::Source.from(title: "Title", logo: "logo.png", avatar: "avatar.png")
+    expect(source.logo).to eq("logo.png")
+    expect(source.avatar).to eq("avatar.png")
+    expect(Mirzam::Renderer::FONTS).not_to be_empty
+  end
 end
