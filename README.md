@@ -14,13 +14,15 @@ gem install mirzam
 
 ```sh
 mirzam render --input content/posts/hello.md --out public/ogp/hello.png
+mirzam render --input content/posts/hello.json --out public/ogp/hello.png
 mirzam render --title "Hello" --author noxdea --size 1200x630 --out hello.png
 mirzam batch "content/posts/**/*.md" --out-dir public/ogp
 mirzam templates
 ```
 
-Front matter requires `title`; `author`, `date`, `tags`, `accent`, and
-`ogp.template` are optional. The Ruby API is `Mirzam.render(title: "Hello")`.
+Front matter requires `title`; JSON input uses the same metadata keys.
+`author`, `date`, `tags`, `accent`, and `ogp.template` are optional. The Ruby
+API is `Mirzam.render(title: "Hello")`.
 The same batch command is available through [`action.yml`](action.yml).
 
 ## Development
