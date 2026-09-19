@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0b0a">
+  <meta name="description" content="Mirzam is a deterministic 1200x630 OGP image generator for Markdown and JSON metadata.">
+  <link rel="canonical" href="https://noxdea.github.io/mirzam/">
+  <title>Mirzam — Deterministic OGP images</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b0b0a; --panel:#151512; --line:#34342c; --text:#f2f0e8; --muted:#aaa79a; --accent:#d7b66f; --ink:#1b160b; }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body { margin: 0; min-width: 320px; color: var(--text); background: var(--bg); font: 16px/1.62 "Avenir Next", Avenir, "Segoe UI", sans-serif; }
+    a { color: inherit; }
+    .skip { position: absolute; top: -5rem; left: 1rem; z-index: 20; padding: .65rem .9rem; color: var(--ink); background: var(--accent); }
+    .skip:focus { top: 1rem; }
+    .wrap { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    header { display: flex; align-items: center; justify-content: space-between; min-height: 76px; border-bottom: 1px solid var(--line); }
+    .brand { font: 700 1.15rem/1 Futura, "Avenir Next", sans-serif; text-decoration: none; }
+    nav { display: flex; gap: 1.4rem; color: var(--muted); font-size: .9rem; }
+    nav a { text-decoration: none; }
+    nav a:hover { color: var(--text); }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .hero { padding: 84px 0 96px; }
+    .hero-copy { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem, 7vw, 7rem); align-items: end; margin-bottom: 52px; }
+    .context { margin: 0 0 1.2rem; color: var(--accent); font-size: .95rem; }
+    h1, h2 { margin: 0; font-family: Futura, "Avenir Next", sans-serif; font-weight: 700; text-wrap: balance; }
+    h1 { max-width: 13ch; font-size: clamp(3.2rem, 5.8vw, 5.8rem); line-height: .95; }
+    h2 { font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.06; }
+    p { text-wrap: pretty; }
+    .lede { max-width: 55ch; margin: 0; color: var(--muted); font-size: 1.08rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.8rem; }
+    .button { display: inline-flex; align-items: center; min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--line); text-decoration: none; }
+    .button.primary { border-color: var(--accent); color: var(--ink); background: var(--accent); font-weight: 700; }
+    .stage { display: grid; grid-template-columns: 180px 1fr; border: 1px solid var(--line); background: var(--panel); }
+    .metadata { padding: 1.2rem; border-right: 1px solid var(--line); font: .72rem/1.7 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    .metadata dl { margin: 0; }
+    .metadata dt { margin-top: 1rem; color: var(--muted); }
+    .metadata dt:first-child { margin-top: 0; }
+    .metadata dd { margin: .1rem 0 0; color: var(--accent); overflow-wrap: anywhere; }
+    .canvas-wrap { display: grid; place-items: center; padding: clamp(18px, 4vw, 48px); }
+    .canvas { display: flex; aspect-ratio: 1200 / 630; width: 100%; min-height: 250px; flex-direction: column; justify-content: space-between; padding: clamp(22px, 5vw, 58px); border: 1px solid #4a473b; color: #eeecdf; background: #1c1d19; }
+    .canvas-brand { color: var(--accent); font-size: clamp(.75rem, 1.4vw, 1rem); }
+    .canvas h3 { max-width: 15ch; margin: 0; font: 700 clamp(2rem, 5vw, 5.6rem)/.98 Futura, "Avenir Next", sans-serif; text-wrap: balance; }
+    .canvas-meta { display: flex; justify-content: space-between; gap: 1rem; color: #a6a99b; font-size: clamp(.7rem, 1.3vw, .95rem); }
+    .section { display: grid; grid-template-columns: .72fr 1.28fr; gap: clamp(2rem, 7vw, 7rem); padding: 88px 0; border-top: 1px solid var(--line); }
+    .section-copy { max-width: 38ch; color: var(--muted); }
+    .templates { border-top: 1px solid var(--line); }
+    .template { display: grid; grid-template-columns: 140px 1fr; gap: 1.5rem; padding: 1.35rem 0; border-bottom: 1px solid var(--line); }
+    .template strong { color: var(--accent); font-weight: 600; }
+    .template p { margin: 0; color: var(--muted); }
+    .pipeline { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); }
+    .phase { min-height: 150px; padding: 1.2rem; border-right: 1px solid var(--line); }
+    .phase:last-child { border-right: 0; }
+    .phase span { color: var(--accent); font-variant-numeric: tabular-nums; }
+    .phase h3 { margin: 2.4rem 0 .35rem; font-size: 1rem; }
+    .phase p { margin: 0; color: var(--muted); font-size: .9rem; }
+    pre.command { margin: 0; overflow-x: auto; padding: 1.2rem; border: 1px solid var(--line); color: var(--accent); background: var(--panel); font: .9rem/1.7 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    footer { display: flex; justify-content: space-between; gap: 1rem; padding: 30px 0 46px; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+    @media (max-width: 860px) {
+      .hero-copy, .section { grid-template-columns: 1fr; }
+      .lede { margin-top: 1rem; }
+      .stage { grid-template-columns: 1fr; }
+      .metadata { border-right: 0; border-bottom: 1px solid var(--line); }
+      .metadata dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+      .metadata dt { margin-top: 0; }
+    }
+    @media (max-width: 580px) {
+      .wrap { width: min(100% - 24px, 1180px); }
+      nav a:not(:last-child) { display: none; }
+      .metadata dl, .pipeline { grid-template-columns: 1fr; }
+      .metadata dl { gap: .35rem; }
+      .canvas-wrap { padding: 10px; }
+      .canvas { min-height: 230px; }
+      .template { grid-template-columns: 1fr; gap: .35rem; }
+      .phase { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .phase:last-child { border-bottom: 0; }
+      .phase h3 { margin-top: 1rem; }
+      footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="wrap">
+    <a class="brand" href="./">Mirzam</a>
+    <nav aria-label="Primary navigation">
+      <a href="#templates">Templates</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="https://github.com/noxdea/mirzam">Source</a>
+    </nav>
+  </header>
+  <main id="content">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <div><p class="context">Deterministic OGP images</p><h1>Give every article a deliberate first frame.</h1></div>
+        <div><p class="lede">Mirzam turns Markdown front matter or JSON metadata into repeatable 1200×630 PNGs, one image or a whole publication at a time.</p><div class="actions"><a class="button primary" href="https://rubygems.org/gems/mirzam">Install the gem</a><a class="button" href="https://github.com/noxdea/mirzam#quick-start">Read the guide</a></div></div>
+      </div>
+      <div class="stage" aria-label="Mirzam OGP rendering example">
+        <aside class="metadata"><dl><dt>title</dt><dd>Build native Ruby interfaces</dd><dt>template</dt><dd>feature</dd><dt>accent</dt><dd>#d7b66f</dd><dt>size</dt><dd>1200 × 630</dd></dl></aside>
+        <div class="canvas-wrap"><article class="canvas"><span class="canvas-brand">noxdea / field notes</span><h3>Build native Ruby interfaces</h3><div class="canvas-meta"><span>Ruby · UI</span><span>2026-09-20</span></div></article></div>
+      </div>
+    </section>
+    <section class="section wrap" id="templates">
+      <div><h2>Three templates, one stable renderer.</h2><p class="section-copy">Choose the amount of visual structure that fits the story, then keep output stable across local and CI builds.</p></div>
+      <div class="templates">
+        <div class="template"><strong>Default</strong><p>Balances author, date, title, tags, and optional brand art.</p></div>
+        <div class="template"><strong>Minimal</strong><p>Centers the title and removes everything that does not support it.</p></div>
+        <div class="template"><strong>Feature</strong><p>Adds supporting description and a source-controlled accent.</p></div>
+      </div>
+    </section>
+    <section class="section wrap" id="pipeline">
+      <div><h2>Metadata becomes a cached asset.</h2></div>
+      <div class="pipeline">
+        <div class="phase"><span>01</span><h3>Read</h3><p>Load Markdown front matter or JSON with relative brand assets.</p></div>
+        <div class="phase"><span>02</span><h3>Fit</h3><p>Measure the title and select a size that respects the frame.</p></div>
+        <div class="phase"><span>03</span><h3>Write</h3><p>Save PNG and SHA-256 state, skipping unchanged batch inputs.</p></div>
+      </div>
+    </section>
+    <section class="section wrap">
+      <div><h2>Render the first image.</h2></div>
+      <pre class="command"><code>gem install mirzam
+mirzam render --input article.md --out ogp.png</code></pre>
+    </section>
+  </main>
+  <footer class="wrap"><span>Mirzam 0.1.0</span><span>Ruby 3.2+ · MIT</span></footer>
+</body>
+</html>
