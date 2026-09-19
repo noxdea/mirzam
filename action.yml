@@ -24,7 +24,7 @@ runs:
   using: composite
   steps:
     - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
+      uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1.323.0
       with:
         ruby-version: '3.3'
     - name: Install Mirzam
@@ -32,8 +32,14 @@ runs:
       run: gem install mirzam --no-document
     - name: Render OGP images
       shell: bash
+      env:
+        MIRZAM_PATTERN: ${{ inputs.pattern }}
+        MIRZAM_OUT_DIR: ${{ inputs.out-dir }}
+        MIRZAM_TEMPLATE: ${{ inputs.template }}
+        MIRZAM_THEME: ${{ inputs.theme }}
+        MIRZAM_FORCE: ${{ inputs.force }}
       run: |
-        args=(batch "${{ inputs.pattern }}" --out-dir "${{ inputs.out-dir }}" --template "${{ inputs.template }}")
-        [[ "${{ inputs.theme }}" != dark ]] && args+=(--theme "${{ inputs.theme }}")
-        [[ "${{ inputs.force }}" == true ]] && args+=(--force)
+        args=(batch "$MIRZAM_PATTERN" --out-dir "$MIRZAM_OUT_DIR" --template "$MIRZAM_TEMPLATE")
+        [[ "$MIRZAM_THEME" != dark ]] && args+=(--theme "$MIRZAM_THEME")
+        [[ "$MIRZAM_FORCE" == true ]] && args+=(--force)
         mirzam "${args[@]}"
