@@ -97,6 +97,7 @@ module Mirzam
     class Feature < Default
       def call(source, renderer)
         Default.new(theme: @theme, accent: source.accent || @accent).call(source, renderer)
+          .child(Zaniah::Text.new(source.description.to_s, size: 16, color: @theme.colors.text_muted))
       end
     end
 
@@ -120,12 +121,13 @@ module Mirzam
 
   class Renderer
     SIZE = [1200, 630].freeze
+    FONTS = Dir[File.expand_path("../assets/fonts/*.{ttf,otf}", __dir__)].freeze
 
     attr_reader :typesetter
 
     def initialize(theme: Zaniah::Theme.dark, width: SIZE[0], height: SIZE[1], font_dir: nil)
-      @theme, @width, @height = theme, width, height
-      @font_db = Zaniah::TextSystem::FontDB.new(paths: Array(font_dir).compact)
+      @theme, @width, @height, @font_dir = theme, width, height, font_dir
+      @font_db = Zaniah::TextSystem::FontDB.new(paths: font_dir ? Array(font_dir) : FONTS)
       @font = @font_db.find(family: theme.typography.font_sans)
       @text_system = Zaniah::TextSystem::Renderer.new(font: @font, font_db: @font_db)
       @typesetter = Zaniah::TextSystem::Typesetter.new(font: @font, font_db: @font_db)
@@ -136,6 +138,10 @@ module Mirzam
     def fit_size(text, max_width:, max_height:)
       return Sizing.fit_size(text, max_width: max_width, max_height: max_height, typesetter: @typesetter) if @typesetter
       Sizing::SIZES.last
+    end
+
+    def cache_key
+      [@width, @height, @font_dir, @theme.inspect].join("\0")
     end
 
     def render(source, template: Templates::Default.new(theme: @theme))
@@ -162,7 +168,7 @@ module Mirzam
         destination = File.join(out_dir, "#{File.basename(path, ".*")}.png")
         template_path = @template.to_s
         template_signature = File.file?(template_path) ? File.binread(template_path) : @template.to_s
-        signature = Digest::SHA256.hexdigest(File.binread(path) + template_signature)
+        signature = Digest::SHA256.hexdigest(File.binread(path) + template_signature + @renderer.cache_key)
         state_path = "#{destination}.json"
         next if !force && File.file?(destination) && File.file?(state_path) && File.read(state_path).include?(signature)
         png = @renderer.render(source, template: Templates.resolve(source.template || @template))
