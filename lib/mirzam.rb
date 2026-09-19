@@ -5,6 +5,7 @@ require "digest"
 require "fileutils"
 require "json"
 require "optparse"
+require "pathname"
 require "yaml"
 require "zlib"
 require "zaniah"
@@ -59,13 +60,22 @@ module Mirzam
 
     def read(path)
       source = File.read(path, encoding: "UTF-8")
-      return Source.from(JSON.parse(source)) if File.extname(path).downcase == ".json"
-      FrontMatter.parse(source)
+      metadata = File.extname(path).downcase == ".json" ? Source.from(JSON.parse(source)) : FrontMatter.parse(source)
+      base = File.dirname(File.expand_path(path))
+      metadata.with(logo: resolve_asset(metadata.logo, base), avatar: resolve_asset(metadata.avatar, base))
     rescue Errno::ENOENT
       raise Error, "input file not found: #{path}"
     rescue JSON::ParserError => error
       raise Error, "invalid JSON: #{error.message}"
     end
+
+    def resolve_asset(value, base)
+      return value unless value && !value.empty? && !Pathname.new(value).absolute?
+      File.expand_path(value, base)
+    rescue ArgumentError
+      value
+    end
+    private_class_method :resolve_asset
   end
 
   module Sizing

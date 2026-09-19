@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "tempfile"
+require "fileutils"
 
 RSpec.describe Mirzam do
   it "parses front matter and normalizes optional values" do
@@ -35,5 +36,14 @@ RSpec.describe Mirzam do
     expect(source.logo).to eq("logo.png")
     expect(source.avatar).to eq("avatar.png")
     expect(Mirzam::Renderer::FONTS).not_to be_empty
+  end
+
+  it "resolves image metadata relative to the input document" do
+    dir = Dir.mktmpdir("mirzam-assets")
+    path = File.join(dir, "post.md")
+    File.write(path, "---\ntitle: Title\nlogo: assets/logo.png\n---\n")
+    expect(Mirzam::Input.read(path).logo).to eq(File.join(dir, "assets/logo.png"))
+  ensure
+    FileUtils.remove_entry(dir) if dir
   end
 end
