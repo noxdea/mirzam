@@ -57,4 +57,13 @@ RSpec.describe Mirzam do
     source = Mirzam::FrontMatter.parse("\uFEFF---\ntitle: BOM\n---\n本文")
     expect(source.title).to eq("BOM")
   end
+
+  it "accepts a UTF-8 BOM before JSON metadata" do
+    file = Tempfile.new(["mirzam", ".json"])
+    file.write("\uFEFF{\"title\":\"BOM\"}")
+    file.close
+    expect(Mirzam::Input.read(file.path).title).to eq("BOM")
+  ensure
+    file&.unlink
+  end
 end

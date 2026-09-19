@@ -60,7 +60,7 @@ module Mirzam
     module_function
 
     def read(path)
-      source = File.read(path, encoding: "UTF-8")
+      source = File.read(path, encoding: "UTF-8").delete_prefix("\uFEFF")
       metadata = File.extname(path).downcase == ".json" ? Source.from(JSON.parse(source)) : FrontMatter.parse(source)
       base = File.dirname(File.expand_path(path))
       metadata.with(logo: resolve_asset(metadata.logo, base), avatar: resolve_asset(metadata.avatar, base))
